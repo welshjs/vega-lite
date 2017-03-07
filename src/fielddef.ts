@@ -265,6 +265,11 @@ export function normalize(fieldDef: ChannelDef, channel: Channel) {
     if (!compatible) {
       log.warn(warning);
     }
+    if (fieldDef.type === 'ordinal') {
+      if ((<PositionFieldDef>fieldDef).axis.format) {
+        log.warn(log.message.CANNOT_FORMAT_ORDINAL_GUIDES);
+      }
+    }
   }
   return fieldDef;
 }
