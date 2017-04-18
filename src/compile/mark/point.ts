@@ -1,5 +1,3 @@
-
-
 import {UnitModel} from '../unit';
 import * as mixins from './mixins';
 
@@ -8,15 +6,24 @@ import {getMarkConfig} from '../common';
 import {MarkCompiler} from './base';
 import * as ref from './valueref';
 
+import {isFieldDef, isProjection} from '../../fielddef';
+import {LATITUDE, LONGITUDE} from '../../type';
+import {contains, keys} from '../../util';
+import {VgPostEncodingTransform} from '../../vega.schema';
+
 function encodeEntry(model: UnitModel, fixedShape?: 'circle' | 'square') {
-  const {config, width, height} = model;
-
+  const {config, encoding, width, height} = model;
   return {
-    ...mixins.pointPosition('x', model, ref.midX(width, config)),
-    ...mixins.pointPosition('y', model, ref.midY(height, config)),
-
-    ...mixins.color(model),
+    ...(isProjection(encoding.x) || isProjection(encoding.y)) ? {
+      // TODO: obviously these can't be hardcoded like this
+      x: {'field': model.getName(LONGITUDE)},
+      y: {'field': model.getName(LATITUDE)}
+    } : {
+      x: mixins.pointPosition('x', model, ref.midX(width, config)),
+      y: mixins.pointPosition('y', model, ref.midY(height, config))
+    },
     ...mixins.nonPosition('size', model),
+    ...mixins.color(model),
     ...shapeMixins(model, config, fixedShape),
     ...mixins.nonPosition('opacity', model)
   };
@@ -26,7 +33,9 @@ export function shapeMixins(model: UnitModel, config: Config, fixedShape?: 'circ
   if (fixedShape) {
     return {shape: {value: fixedShape}};
   }
-  return mixins.nonPosition('shape', model, {defaultValue: getMarkConfig('shape', 'point', config) as string});
+  return mixins.nonPosition('shape', model, {
+    defaultValue: getMarkConfig('shape', 'point', config) as string
+  });
 }
 
 export const point: MarkCompiler = {

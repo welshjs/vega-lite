@@ -1,7 +1,7 @@
 // utility for encoding mapping
 import {Channel, CHANNELS, supportMark} from './channel';
 import {Facet} from './facet';
-import {ChannelDef, ConditionalValueDef, FieldDef, isFieldDef, isValueDef, LegendFieldDef, normalize, OrderFieldDef, PositionFieldDef, TextFieldDef, ValueDef} from './fielddef';
+import {ChannelDef, ConditionalValueDef, FieldDef, isFieldDef, isProjection, isValueDef, LegendFieldDef, normalize, OrderFieldDef, PositionFieldDef, TextFieldDef, ValueDef} from './fielddef';
 import * as log from './log';
 import {Mark} from './mark';
 import {isArray, some} from './util';
@@ -9,14 +9,14 @@ import {isArray, some} from './util';
 export interface Encoding {
   /**
    * X coordinates for `point`, `circle`, `square`,
-   * `line`, `rule`, `text`, and `tick`
+   * `line`, `rule`, `text`, `geoshape` and `tick`
    * (or to width and height for `bar` and `area` marks).
    */
   x?: PositionFieldDef | ValueDef<number>;
 
   /**
    * Y coordinates for `point`, `circle`, `square`,
-   * `line`, `rule`, `text`, and `tick`
+   * `line`, `rule`, `text`, `geoshape` and `tick`
    * (or to width and height for `bar` and `area` marks).
    */
   y?: PositionFieldDef | ValueDef<number>;
@@ -33,7 +33,7 @@ export interface Encoding {
 
   /**
    * Color of the marks – either fill or stroke color based on mark type.
-   * (By default, fill color for `area`, `bar`, `tick`, `text`, `circle`, and `square` /
+   * (By default, fill color for `area`, `bar`, `tick`, `text`, `circle`, `geoshape` and `square` /
    * stroke color for `line` and `point`.)
    */
   color?: LegendFieldDef<string> | ConditionalValueDef<string>;
@@ -89,6 +89,11 @@ export function channelHasField(encoding: EncodingWithFacet, channel: Channel): 
     }
   }
   return false;
+}
+
+export function channelIsProjection(encoding: EncodingWithFacet, channel: Channel) {
+  const channelDef = encoding && encoding[channel];
+  return channelDef && isFieldDef(channelDef) && isProjection(channelDef);
 }
 
 export function isAggregate(encoding: EncodingWithFacet) {

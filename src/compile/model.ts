@@ -5,13 +5,14 @@ import {Data, DataSourceType, MAIN, RAW} from '../data';
 import {forEach, reduce} from '../encoding';
 import {ChannelDef, field, FieldDef, FieldRefOption, isFieldDef} from '../fielddef';
 import {Legend} from '../legend';
+import {Projection} from '../projection';
 import {hasDiscreteDomain, Scale} from '../scale';
 import {SortField, SortOrder} from '../sort';
 import {BaseSpec} from '../spec';
 import {StackProperties} from '../stack';
 import {Transform} from '../transform';
 import {Dict, extend, vals} from '../util';
-import {VgAxis, VgData, VgEncodeEntry, VgLegend, VgScale} from '../vega.schema';
+import {VgAxis, VgData, VgEncodeEntry, VgLegend, VgProjection, VgScale} from '../vega.schema';
 
 import {DataComponent} from './data/index';
 import {LayoutComponent} from './layout';
@@ -29,6 +30,9 @@ export interface Component {
   layout: LayoutComponent;
   scales: Dict<VgScale>;
   selection: Dict<SelectionComponent>;
+
+  /** Array of projections, which don't use channel mapping */
+  projections: VgProjection[];
 
   /** Dictionary mapping channel to VgAxis definition */
   axes: Dict<VgAxis[]>;
@@ -95,6 +99,8 @@ export abstract class Model {
 
   protected legends: Dict<Legend> = {};
 
+  public readonly projection: Projection;
+
   protected _stack: StackProperties = null;
 
   public readonly config: Config;
@@ -125,7 +131,7 @@ export abstract class Model {
         outputNodes: parent ? parent.component.data.outputNodes : {}
       },
       layout: null, mark: null, scales: null, axes: null,
-      axisGroups: null, legends: null, selection: null
+      axisGroups: null, legends: null, selection: null, projections: null,
     };
   }
 
@@ -133,6 +139,7 @@ export abstract class Model {
     this.parseData();
     this.parseLayoutData();
     this.parseScale(); // depends on data name
+    this.parseProjection();
     this.parseSelection();
     this.parseAxis(); // depends on scale name
     this.parseLegend(); // depends on scale name
@@ -147,6 +154,8 @@ export abstract class Model {
   public abstract parseLayoutData(): void;
 
   public abstract parseScale(): void;
+
+  public abstract parseProjection(): void;
 
   public abstract parseMark(): void;
 
@@ -168,6 +177,10 @@ export abstract class Model {
     return assembleScale(this);
   }
 
+  public assembleProjections(): VgProjection[] {
+    return this.component.projections || [];
+  }
+
   public abstract assembleMarks(): any[]; // TODO: VgMarkGroup[]
 
   public assembleAxes(): VgAxis[] {
@@ -186,7 +199,9 @@ export abstract class Model {
       group.signals = signals;
     }
 
+    // TODO: consider if we want scales to come before marks in the output spec.
     group.marks = this.assembleMarks();
+
     const scales = this.assembleScales();
     if (scales.length > 0) {
       group.scales = scales;
@@ -209,10 +224,10 @@ export abstract class Model {
 
   public abstract channels(): Channel[];
 
-  protected abstract getMapping(): {[key: string]: any};
+  protected abstract getMapping(): { [key: string]: any };
 
   public reduceFieldDef<T, U>(f: (acc: U, fd: FieldDef, c: Channel) => U, init: T, t?: any) {
-    return reduce(this.getMapping(), (acc:U , cd: ChannelDef, c: Channel) => {
+    return reduce(this.getMapping(), (acc: U, cd: ChannelDef, c: Channel) => {
       return isFieldDef(cd) ? f(acc, cd, c) : acc;
     }, init, t);
   }
@@ -278,7 +293,7 @@ export abstract class Model {
   }
 
   public sizeName(size: string): string {
-     return this.sizeNameMap.get(this.getName(size, '_'));
+    return this.sizeNameMap.get(this.getName(size));
   }
 
   /** Get "field" reference for vega */
@@ -309,7 +324,6 @@ export abstract class Model {
     this.scaleNameMap.rename(oldName, newName);
   }
 
-
   /**
    * @return scale name for a given channel after the scale has been parsed and named.
    */
@@ -324,11 +338,11 @@ export abstract class Model {
     // If there is a scale for the channel, it should either
     // be in the _scale mapping or exist in the name map
     if (
-        // in the scale map (the scale is not merged by its parent)
-        (this.scale && this.scales[originalScaleName]) ||
-        // in the scale name map (the the scale get merged by its parent)
-        this.scaleNameMap.has(this.getName(originalScaleName))
-      ) {
+      // in the scale map (the scale is not merged by its parent)
+      (this.scale && this.scales[originalScaleName]) ||
+      // in the scale name map (the the scale get merged by its parent)
+      this.scaleNameMap.has(this.getName(originalScaleName))
+    ) {
       return this.scaleNameMap.get(this.getName(originalScaleName));
     }
     return undefined;

@@ -4,11 +4,12 @@ import {CellConfig, Config} from '../config';
 import {FieldDef} from '../fielddef';
 import {Legend} from '../legend';
 import {FILL_STROKE_CONFIG} from '../mark';
+import {Projection} from '../projection';
 import {Scale} from '../scale';
 import {LayerSpec} from '../spec';
 import {StackProperties} from '../stack';
 import {Dict, flatten, keys, vals} from '../util';
-import {isSignalRefDomain, VgData, VgEncodeEntry, VgScale} from '../vega.schema';
+import {isSignalRefDomain, VgData, VgEncodeEntry, VgProjection, VgScale} from '../vega.schema';
 
 import {applyConfig, buildModel} from './common';
 import {assembleData} from './data/assemble';
@@ -130,6 +131,12 @@ export class LayerModel extends Model {
     });
   }
 
+  public parseProjection() {
+    this.children.forEach(child => {
+      child.parseProjection();
+    });
+  }
+
   public parseMark() {
     this.children.forEach(child => {
       child.parseMark();
@@ -204,6 +211,14 @@ export class LayerModel extends Model {
     return this.children.reduce((scales, c) => {
       return scales.concat(c.assembleScales());
     }, super.assembleScales());
+  }
+
+  public assembleProjections(): VgProjection[] {
+    // aggregate scales from children into one array
+    // TODO: reduce redundency?
+    return this.children.reduce((projections, c) => {
+      return projections.concat(c.assembleProjections());
+    }, []);
   }
 
   public assembleLayout(layoutData: VgData[]): VgData[] {
